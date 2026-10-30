@@ -22,6 +22,8 @@ from file_service import (
 from authorization import require_permission
 from fastapi import File, UploadFile, Depends
 from file_service import process_uploaded_file
+from document_ingestion import split_text_into_chunks
+from document_storage import save_document_chunks
 import logging
 
 logger = logging.getLogger(__name__)
@@ -328,29 +330,72 @@ async def upload_file(
     
 
 
+
 @app.post("/files/upload", status_code=201)
 async def upload_file(
     file: UploadFile = File(...),
     user_id: int = Depends(require_permission("chat:use")),
 ):
-    extracted = await process_uploaded_file(file)
-
     try:
-        result = save_uploaded_file(user_id, extracted)
+        # 1. Extract text
+        extracted = await process_uploaded_file(file)
+
+        logger.info(
+            "FILE EXTRACTED: filename=%s, characters=%s",
+            extracted["filename"],
+            len(extracted["text"]),
+        )
+
+        # 2. Save file
+        saved = save_uploaded_file(user_id, extracted)
+
+        logger.info("FILE SAVED: file_id=%s", saved["id"])
+
+        # 3. Split into chunks
+        chunks = split_text_into_chunks(
+            extracted["text"],
+            chunk_size=1000,
+            overlap=150,
+        )
+
+        logger.info(
+            "CHUNKS CREATED: file_id=%s, total_chunks=%s, chunk_lengths=%s",
+            saved["id"],
+            len(chunks),
+            [len(chunk) for chunk in chunks],
+        )
+
+        # 4. Save chunks
+        chunk_count = save_document_chunks(
+            user_id=user_id,
+            file_id=saved["id"],
+            chunks=chunks,
+        )
+
+        logger.info(
+            "CHUNKS SAVED: file_id=%s, saved_count=%s",
+            saved["id"],
+            chunk_count,
+        )
+
+        # 5. Response
+        return {
+            "success": True,
+            "file": saved,
+            "total_chunks": len(chunks),
+            "saved_chunks": chunk_count,
+            "status": "processed",
+        }
+
+    except HTTPException:
+        raise
+
     except Exception:
-        logger.exception("Unexpected error while saving uploaded file.")
-        # Log the detailed error on the server in production.
-        # Do not expose database credentials or raw SQL errors.
+        logger.exception("Unexpected error while uploading file.")
         raise HTTPException(
             status_code=500,
-            detail="Could not save the uploaded file.",
+            detail="Could not upload the file.",
         ) from None
-
-    return {
-        "success": True,
-        "file": result,
-    }
-
 
 @app.get("/files")
 def get_my_files(

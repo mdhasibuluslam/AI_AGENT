@@ -10,7 +10,7 @@ MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 @lru_cache(maxsize=1)
 def get_embedding_model():
     """Load the model once per Python process."""
-    return SentenceTransformer(MODEL_NAME)
+    return SentenceTransformer(MODEL_NAME)   
 
 
 def create_embedding(text: str) -> list[float]:

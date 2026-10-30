@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from agent import graph
 from memory import get_history, save_message
+from tool_permissions import set_tool_user, reset_tool_user
 
 
 def extract_text(content) -> str:
@@ -24,8 +25,16 @@ def extract_text(content) -> str:
     return str(content)
 
 
-def chat(message: str, conversation_id: str) -> str:
+def chat(message: str, conversation_id: str, user_id:int) -> str:
     """Run the existing agent and persist the conversation."""
+    
+    if not isinstance(message, str):
+        raise ValueError("Message must be a string.")
+    if not isinstance(conversation_id, str):
+        raise ValueError("Conversation ID must be a string.")
+    if not isinstance(user_id, bool) or not isinstance(user_id, int) or user_id <= 0:
+        raise ValueError("User ID must be a positive integer.")
+
     message = message.strip()
     conversation_id = conversation_id.strip()
 
@@ -34,6 +43,7 @@ def chat(message: str, conversation_id: str) -> str:
 
     if not conversation_id:
         raise ValueError("Conversation ID cannot be empty.")
+    
 
     history = get_history(conversation_id)
 
@@ -45,13 +55,19 @@ def chat(message: str, conversation_id: str) -> str:
         elif item["role"] == "assistant":
             messages.append(AIMessage(content=item["content"]))
 
-    messages.append(HumanMessage(content=message))
+    # Bind authenticated user to this execution context.
+    token = set_tool_user(user_id)
 
-    result = graph.invoke({
-        "messages": messages,
-        "conversation_id": conversation_id,
-        "user_message": message,
-    })
+    try:
+        result = graph.invoke({
+            "messages": messages,
+            "conversation_id": conversation_id,
+            "user_message": message,
+        })
+
+    finally:
+        # Always restore context, even if graph execution fails.
+        reset_tool_user(token)
 
     if not result.get("messages"):
         raise RuntimeError("The agent returned no messages.")

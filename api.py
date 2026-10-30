@@ -297,6 +297,7 @@ def chat_endpoint(
         answer = chat(
             message=message,
             conversation_id=conversation_id,
+            user_id=user_id,
         )
         return ChatResponse(
             conversation_id=conversation_id,

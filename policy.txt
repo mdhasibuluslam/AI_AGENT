@@ -1,4 +1,45 @@
-Our laptop comes with a one-year warranty.,
-Customers can return eligible products within 30 days.,
-The MacBook is suitable for programming and software development.,
-Orders are shipped after payment confirmation.
+flowchart TD
+    CLIENT["Client / Frontend"] --> API["FastAPI"]
+
+    API --> HEALTH["GET /health"]
+    API --> REGISTER["POST /register"]
+    API --> LOGIN["POST /login"]
+    API --> PROTECTED["Protected routes"]
+
+    REGISTER --> HASH["Password hash"]
+    HASH --> USERS[("PostgreSQL: users")]
+    USERS --> CUSTOMER["Default customer role"]
+
+    LOGIN --> VERIFY["Email + password verify"]
+    VERIFY --> JWT["JWT তৈরি: sub = user_id"]
+
+    JWT --> BEARER["পরের request-এ Bearer token"]
+    BEARER --> DECODE["Token verify → user_id"]
+    DECODE --> RBAC["Role/permission check"]
+    RBAC --> PROTECTED
+
+    PROTECTED --> CHAT["POST /chat"]
+    PROTECTED --> FILES["File routes"]
+
+    CHAT --> OWNER["Conversation owner check"]
+    OWNER --> HISTORY["আগের chat history load"]
+    HISTORY --> GRAPH["Agent / LangGraph"]
+    GRAPH --> GEMINI["Gemini model"]
+    GEMINI --> TOOLS{"কোন তথ্য দরকার?"}
+    TOOLS --> PRODUCT["Product search → DummyJSON"]
+    TOOLS --> KNOWLEDGE["Policy search → embeddings + pgvector"]
+    TOOLS --> HOURS["Business hours"]
+    PRODUCT --> GRAPH
+    KNOWLEDGE --> GRAPH
+    HOURS --> GRAPH
+    GRAPH --> SAVE["User ও assistant message save"]
+    SAVE --> MSGDB[("conversation_messages")]
+
+    FILES --> EXTRACT["PDF/TXT validation ও text extract"]
+    EXTRACT --> UPLOADDB[("uploaded_files: user_id")]
+    EXTRACT --> SPLIT["Text chunks-এ ভাগ"]
+    SPLIT --> CHECK["file_id ও user_id owner check"]
+    CHECK --> CHUNKDB[("document_chunks: user_id + file_id")]
+    FILES --> LIST["GET /files: শুধু current user-এর files"]
+
+    KNOWLEDGE -. "এখন uploaded document chunks ব্যবহার করে না" .-> CHUNKDB

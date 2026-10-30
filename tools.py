@@ -3,10 +3,12 @@ from langchain.tools import tool
 
 from api_client import search_products
 from rag import retrieve_knowledge
+from tool_permissions import require_tool_permission
 
 
 
 @tool
+@require_tool_permission("chat:use")
 def product_search(product_name: str) -> dict:
     """
     Search the product catalog and return
@@ -65,6 +67,7 @@ def product_search(product_name: str) -> dict:
 
 
 @tool
+@require_tool_permission("chat:use")
 def knowledge_search(question: str) -> dict:
     """
     Search the internal knowledge base for relevant
@@ -101,6 +104,7 @@ def knowledge_search(question: str) -> dict:
 
 
 @tool
+@require_tool_permission("chat:use")
 def business_hours() -> dict:
     """
     Return the company's business hours.
